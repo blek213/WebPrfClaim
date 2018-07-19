@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <script src="../js/libraries/jquery/dist/jquery.js"></script>
+    <script src="../js/libraries/jquery.unobtrusive-ajax.js"></script>
+</head>
+<body>
+
+    <form id="form">
+
+        <label>Email: </label><br /><br />
+        <input type="email" id="email" name="email" /><br /><br />
+        <label>Password: </label><br /><br />
+        <input type="password" id="password" name="name" /><br /><br />
+        <input type="button" value="AddUser" onclick="return AddUserFunc();" /><br /><br />
+
+    </form>
+
+    <script>
+
+        function AddUserFunc() {
+
+            var email = $("#email").val();
+            var password = $("#password").val();
+
+            email = encodeURIComponent(email);
+            password = encodeURIComponent(password);
+
+            $.ajax({
+                type: 'POST',
+                dataType: 'json',
+                contentType: 'application/JSON',
+                url: '/api/Root/RegisterUser?email=' + email + "&password=" + password,
+                data: { email: email, password: password },
+                //  async: false,
+                success: function (data) {
+                    alert(data);
+                },
+                error: function (message) {
+                    alert("Typed incorrected data or IIS 500 error");
+                    alert(message.statusText);
+                }
+
+            });
+        }
+
+    </script>
+</body>
+</html>
