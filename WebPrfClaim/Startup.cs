@@ -38,6 +38,16 @@ namespace WebPrfClaim
             services.AddIdentity<IdentityUser, IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationContext>()
                 .AddDefaultTokenProviders();
+
+            services.Configure<SecurityStampValidatorOptions>(o =>
+            {
+                o.ValidationInterval = TimeSpan.FromSeconds(10);
+                o.OnRefreshingPrincipal = async ctx => 
+                {
+                    var a =  ctx.CurrentPrincipal;
+                };
+            });
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

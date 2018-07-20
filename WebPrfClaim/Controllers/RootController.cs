@@ -30,36 +30,111 @@ namespace WebPrfClaim.Controllers
             _roleManager = roleManager;
         }
 
+        [Route("GetClaimValue")]
         [HttpGet]
-        public async Task<HttpResponseMessage> LoginUser()
+        public IActionResult GetClaimValue()
         {
-            return new HttpResponseMessage(HttpStatusCode.Accepted);
+            //ClaimsIdentity claimsIdentity = User.Identity as ClaimsIdentity;
+
+            //var claims = claimsIdentity.Claims.Select(x => new { type = x.Type, value = x.Value });
+
+            //return Ok(claims);
+
+            return Json(User.Claims.FirstOrDefault(c=>c.ValueType == "SecurityStamp"));
+        }
+
+        [Route("GetClaimValue2")]
+        [HttpGet]
+        public IActionResult GetClaimValue2()
+        {
+            var identity = (ClaimsIdentity)User.Identity;
+            IEnumerable<Claim> claims = identity.Claims;
+
+            return Json(claims);
+        }
+
+        [Route("GetClaimValue3")]
+        public IActionResult GetClaimValue3()
+        {
+            return Json(User.Claims.Select(c => new { type = c.Type, value = c.Value }).ToList());       
+        }
+
+        [Route("GetClaimValue4")]
+        public IActionResult GetClaimValue4()
+        {
+            var ourToken = Request.HttpContext.Request.Headers["access_token"];
+
+            return Json(ourToken);
+        }
+
+        [Route("ChangeUserRole")]
+        public async Task<JsonResult> ChangeUserRole(string UserId,string newRole)
+        {
+            List<IdentityUser> identityUsers = _userManager.Users.ToList();
+
+            IdentityUser user = identityUsers.FirstOrDefault(p => p.Id == UserId);
+
+            List<IdentityRole> identityRoles = _roleManager.Roles.ToList();
+
+            IdentityRole identityRole = identityRoles.FirstOrDefault(p => p.Name == newRole);
+
+            if(identityRole == null)
+            {
+                var roleUser = new IdentityRole { Name = newRole};
+
+                await _roleManager.CreateAsync(roleUser);
+            }
+
+            await _userManager.AddToRoleAsync(user, newRole);
+
+            await _userManager.UpdateSecurityStampAsync(user);
+
+            return Json(HttpStatusCode.Accepted);
         }
 
         [Route("LoginUser")]
         [HttpPost]
         public async Task<JsonResult> LoginUser(string email, string password)
         {
-            var result = GetIdentityLogin(email, password);
+            var identity = GetIdentityLogin(email, password);
 
+            if (identity != null)
+            {
+                var now = DateTime.UtcNow;
 
-            return Json(HttpStatusCode.Accepted);
+                var jwt = new JwtSecurityToken(
+                        issuer: AuthOptions.ISSUER,
+                        audience: AuthOptions.AUDIENCE,
+                        notBefore: now,
+                        claims: identity.Claims,
+                        expires: now.Add(TimeSpan.FromHours(AuthOptions.LIFETIME)),
+                        signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
+                var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
+
+                var response = new
+                {
+                    access_token = encodedJwt,
+                    username = identity.Name
+                };
+
+                return Json(new { JsonResponseRes = response, JsonHttpStatusCode = HttpStatusCode.Accepted });
+            }
+
+            return Json(HttpStatusCode.BadRequest);
         }
 
         [Route("RegisterUser")]
         [HttpPost]
         public async Task<JsonResult> RegisterUser(string email, string password)
-        {
-         
+        {       
                 User user = new User { Email = email, UserName = email, Year=2012  };
 
                 var roleUser = new IdentityRole { Name = "User" };
 
                 await _roleManager.CreateAsync(roleUser);
-
-            // добавляем пользователя
-
-               var result = await _userManager.CreateAsync(user, password);
+ 
+                // добавляем пользователя
+                var result = await _userManager.CreateAsync(user, password);
 
                 if (result.Succeeded)
                 {
@@ -88,19 +163,20 @@ namespace WebPrfClaim.Controllers
         {
             List<IdentityUser> identityUsers = _userManager.Users.ToList();
 
-            IdentityUser user = identityUsers.FirstOrDefault(p => p.UserName == name);
+            IdentityUser IdentityUser = identityUsers.FirstOrDefault(p => p.UserName == name);
+          
+            var checkPassword = _userManager.CheckPasswordAsync(IdentityUser, password);
 
-            var checkPassword = _userManager.CheckPasswordAsync(user, password);
-
-            if (user != null && checkPassword.Result == true)
+            if (IdentityUser != null && checkPassword.Result == true)
             {
 
                 var claims = new List<Claim>
                 {
-                    new Claim(ClaimsIdentity.DefaultIssuer,user.SecurityStamp),
+                    new Claim("SecurityStamp",IdentityUser.SecurityStamp),
+                    new Claim("UserRole","User")
                 };
 
-                ClaimsIdentity claimsIdentity = new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultIssuer, ClaimsIdentity.DefaultRoleClaimType);
+                ClaimsIdentity claimsIdentity = new ClaimsIdentity(claims, "Token", "SecurityStamp", "UserRole");
 
                 return claimsIdentity;
             }
@@ -115,10 +191,11 @@ namespace WebPrfClaim.Controllers
 
             var claims = new List<Claim>
                 {
-                    new Claim(ClaimsIdentity.DefaultIssuer,identity.Result.SecurityStamp),
+                    new Claim("SecurityStamp",identity.Result.SecurityStamp),
+                    new Claim("UserRole","User")
                 };
 
-            ClaimsIdentity claimsIdentity = new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultIssuer, ClaimsIdentity.DefaultRoleClaimType);
+            ClaimsIdentity claimsIdentity = new ClaimsIdentity(claims, "Token", "SecurityStamp", "UserRole");
 
             return claimsIdentity;
         }
@@ -137,10 +214,10 @@ namespace WebPrfClaim.Controllers
             return null;
         }
 
-
         public async Task<HttpResponseMessage> ChangeRoleUser()
         {
             return new HttpResponseMessage(HttpStatusCode.Accepted);
         }
+
     }
 }

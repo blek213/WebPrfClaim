@@ -8,6 +8,7 @@ namespace WebPrfClaim.Models
 {
     public class User : IdentityUser
     {
+        public int TempCheckVal { get; set; }
         public int Year { get; set; }
     }
 }
